@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "icon": "https://agent.expo.app/static/icon.png",
+    "orientation": "default",
+    "scheme": "acme",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "output": "server"
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "experiments": {
+      "reactCompiler": true
+    },
+    "plugins": [
+      "expo-font",
+      "expo-image",
+      "expo-router",
+      "expo-web-browser",
+      "@bacons/apple-colors",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Run Tracker to access your location to track your runs."
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {}
+      ]
+    ],
+    "name": "Run Tracker Go",
+    "owner": "0rtbo",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a0a94bd2-0c7b-4e84-830a-dac7d390304d"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.0rtbo.run0",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "4",
+      "runtimeVersion": "1.0.0"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a0a94bd2-0c7b-4e84-830a-dac7d390304d"
+    }
+  }
+}
