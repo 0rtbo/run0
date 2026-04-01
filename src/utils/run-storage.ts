@@ -3,6 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export interface Coordinate {
   latitude: number;
   longitude: number;
+  accuracy?: number | null;
+  speed?: number | null;
+  timestamp?: number;
 }
 
 export interface Run {
@@ -59,12 +62,12 @@ export function calcDistance(coords: Coordinate[]): number {
   if (coords.length < 2) return 0;
   let total = 0;
   for (let i = 1; i < coords.length; i++) {
-    total += haversine(coords[i - 1], coords[i]);
+    total += distanceBetween(coords[i - 1], coords[i]);
   }
   return total;
 }
 
-function haversine(a: Coordinate, b: Coordinate): number {
+export function distanceBetween(a: Coordinate, b: Coordinate): number {
   const R = 6371000; // meters
   const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
   const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
