@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from "react-native";
+import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@/components/icon";
@@ -14,15 +15,9 @@ import {
   formatPace,
 } from "@/utils/run-storage";
 
-const PINK = "#FF375F";
-const BG = "#0a0a0a";
-const CARD = "#1a1a1a";
-const DIM = "rgba(255,255,255,0.5)";
-const WHITE = "#fff";
-const BORDER = "rgba(255,255,255,0.08)";
-
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const [runs, setRuns] = useState<Run[]>([]);
 
   useFocusEffect(
@@ -46,7 +41,7 @@ export default function HistoryScreen() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Stack.Screen options={{ headerShown: false }} />
       <Header title="Activity" />
       <ScrollView
@@ -81,6 +76,7 @@ export default function HistoryScreen() {
 
 function RunCard({ run, onDelete }: { run: Run; onDelete: () => void }) {
   const router = useRouter();
+  const { theme } = useUnistyles();
   const date = new Date(run.date);
   const dateStr = date.toLocaleDateString(undefined, {
     weekday: "long",
@@ -105,6 +101,7 @@ function RunCard({ run, onDelete }: { run: Run; onDelete: () => void }) {
           coordinates={run.coordinates}
           style={{ height: 140 }}
           interactive={false}
+          enable3D
         />
       )}
 
@@ -123,7 +120,7 @@ function RunCard({ run, onDelete }: { run: Run; onDelete: () => void }) {
             hitSlop={12}
             style={({ pressed }) => ({ opacity: pressed ? 0.4 : 1 })}
           >
-            <Icon sf="ellipsis" fallback="ellipsis-horizontal" size={18} color={DIM} />
+            <Icon sf="ellipsis" fallback="ellipsis-horizontal" size={18} color={theme.colors.muted} />
           </Pressable>
         </View>
 
@@ -149,9 +146,11 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function EmptyState() {
+  const { theme } = useUnistyles();
+
   return (
     <View style={styles.empty}>
-      <Icon sf="figure.run" fallback="walk-outline" size={48} color="rgba(255,255,255,0.15)" />
+      <Icon sf="figure.run" fallback="walk-outline" size={48} color={theme.colors.default} />
       <Text style={styles.emptyTitle}>No runs yet</Text>
       <Text style={styles.emptySubtitle}>
         Your completed runs will appear here.
@@ -169,9 +168,9 @@ function getRunTitle(date: Date): string {
   return "Night Run";
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   count: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 13,
     fontWeight: "500",
     textTransform: "uppercase",
@@ -179,7 +178,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   card: {
-    backgroundColor: CARD,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     borderCurve: "continuous",
     overflow: "hidden",
@@ -193,12 +192,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   cardTitle: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 17,
     fontWeight: "600",
   },
   cardDate: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 13,
     marginTop: 2,
   },
@@ -210,13 +209,13 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   statValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 15,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
   statLabel: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 11,
     fontWeight: "500",
     textTransform: "uppercase",
@@ -229,13 +228,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyTitle: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 20,
     fontWeight: "600",
   },
   emptySubtitle: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 15,
     textAlign: "center",
   },
-});
+}));

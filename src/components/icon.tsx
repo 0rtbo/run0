@@ -10,14 +10,18 @@ interface IconProps {
   color?: string;
 }
 
-export default function Icon({ sf, fallback, size = 20, color = "#fff" }: IconProps) {
+export default function Icon({ sf, fallback, size = 20, color }: IconProps) {
+  // Default color is handled by the caller via theme.colors.text
+  // We keep a safe fallback for standalone usage
+  const resolvedColor = color ?? "#fff";
+
   if (process.env.EXPO_OS === "ios") {
     return (
       <Image
         source={`sf:${sf}`}
-        style={{ width: size, height: size, color: color as any }}
+        style={{ width: size, height: size, color: resolvedColor as any }}
       />
     );
   }
-  return <Ionicons name={fallback} size={size} color={color} />;
+  return <Ionicons name={fallback} size={size} color={resolvedColor} />;
 }

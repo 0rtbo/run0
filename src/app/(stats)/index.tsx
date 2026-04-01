@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Stack, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "@/components/icon";
@@ -11,13 +12,6 @@ import {
   formatDuration,
   formatPace,
 } from "@/utils/run-storage";
-
-const PINK = "#FF375F";
-const BG = "#0a0a0a";
-const CARD = "#1a1a1a";
-const DIM = "rgba(255,255,255,0.5)";
-const WHITE = "#fff";
-const BORDER = "rgba(255,255,255,0.08)";
 
 interface Stats {
   totalRuns: number;
@@ -101,6 +95,7 @@ function computeStats(runs: Run[]): Stats {
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const [stats, setStats] = useState<Stats | null>(null);
 
   useFocusEffect(
@@ -112,7 +107,7 @@ export default function StatsScreen() {
   if (!stats) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Stack.Screen options={{ headerShown: false }} />
       <Header title="Stats" />
       <ScrollView
@@ -148,12 +143,12 @@ export default function StatsScreen() {
         {/* Streak + Total runs row */}
         <View style={styles.row}>
           <View style={[styles.compactCard, { flex: 1 }]}>
-            <Icon sf="flame.fill" fallback="flame" size={20} color={PINK} />
+            <Icon sf="flame.fill" fallback="flame" size={20} color={theme.colors.accent} />
             <Text style={styles.compactValue}>{stats.streak}</Text>
             <Text style={styles.compactLabel}>Day Streak</Text>
           </View>
           <View style={[styles.compactCard, { flex: 1 }]}>
-            <Icon sf="figure.run" fallback="walk" size={20} color={PINK} />
+            <Icon sf="figure.run" fallback="walk" size={20} color={theme.colors.accent} />
             <Text style={styles.compactValue}>{stats.totalRuns}</Text>
             <Text style={styles.compactLabel}>Total Runs</Text>
           </View>
@@ -231,12 +226,14 @@ function ListRow({
   value: string;
   highlight?: boolean;
 }) {
+  const { theme } = useUnistyles();
+
   return (
     <View style={styles.listRow}>
-      <Icon sf={sf} fallback={fallback} size={18} color={highlight ? PINK : DIM} />
+      <Icon sf={sf} fallback={fallback} size={18} color={highlight ? theme.colors.accent : theme.colors.muted} />
       <Text style={styles.listLabel}>{label}</Text>
       <Text
-        style={[styles.listValue, highlight && { color: PINK }]}
+        style={[styles.listValue, highlight && { color: theme.colors.accent }]}
       >
         {value}
       </Text>
@@ -244,16 +241,16 @@ function ListRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   weekCard: {
-    backgroundColor: CARD,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     borderCurve: "continuous",
     padding: 20,
     gap: 16,
   },
   weekTitle: {
-    color: PINK,
+    color: theme.colors.accent,
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 1.5,
@@ -270,16 +267,16 @@ const styles = StyleSheet.create({
   weekDivider: {
     width: StyleSheet.hairlineWidth,
     height: 32,
-    backgroundColor: BORDER,
+    backgroundColor: theme.colors.border,
   },
   weekValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 22,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
   weekLabel: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 11,
     fontWeight: "500",
     textTransform: "uppercase",
@@ -290,7 +287,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   compactCard: {
-    backgroundColor: CARD,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     borderCurve: "continuous",
     padding: 16,
@@ -298,25 +295,25 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   compactValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 28,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
   compactLabel: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 12,
     fontWeight: "500",
   },
   sectionTitle: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 1,
     marginTop: 4,
   },
   listCard: {
-    backgroundColor: CARD,
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     borderCurve: "continuous",
     overflow: "hidden",
@@ -329,18 +326,18 @@ const styles = StyleSheet.create({
   },
   listDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
+    backgroundColor: theme.colors.border,
     marginLeft: 46,
   },
   listLabel: {
     flex: 1,
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 15,
   },
   listValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 15,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-});
+}));

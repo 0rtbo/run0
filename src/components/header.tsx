@@ -1,11 +1,8 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-
-const WHITE = "#fff";
-const DIM = "rgba(255,255,255,0.5)";
-const BG = "#0a0a0a";
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -30,6 +27,7 @@ export default function Header({
 }: HeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme } = useUnistyles();
 
   return (
     <View
@@ -37,7 +35,7 @@ export default function Header({
         styles.container,
         {
           paddingTop: insets.top + 4,
-          backgroundColor: transparent ? "transparent" : BG,
+          backgroundColor: transparent ? "transparent" : theme.colors.background,
         },
       ]}
     >
@@ -49,7 +47,7 @@ export default function Header({
               hitSlop={12}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name={leftIcon} size={20} color={WHITE} />
+              <Ionicons name={leftIcon} size={20} color={theme.colors.foreground} />
             </Pressable>
           )}
         </View>
@@ -70,7 +68,7 @@ export default function Header({
               hitSlop={12}
               style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
-              <Ionicons name={rightIcon} size={20} color={WHITE} />
+              <Ionicons name={rightIcon} size={20} color={theme.colors.foreground} />
             </Pressable>
           )}
         </View>
@@ -79,7 +77,7 @@ export default function Header({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   container: {
     position: "absolute",
     top: 0,
@@ -101,13 +99,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 17,
     fontWeight: "600",
   },
   subtitle: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 12,
     marginTop: 1,
   },
-});
+}));

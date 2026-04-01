@@ -1,8 +1,13 @@
 import { useEffect, useRef, useMemo } from "react";
 import { View } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 import Mapbox, {
   MapView,
   Camera,
+  RasterDemSource,
+  Terrain,
+  VectorSource,
+  FillExtrusionLayer,
   ShapeSource,
   LineLayer,
   CircleLayer,
@@ -14,12 +19,15 @@ const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 Mapbox.setAccessToken(TOKEN);
 Mapbox.setTelemetryEnabled(false);
 
-const PINK = "#FF375F";
+const MAP_STYLE_3D = "mapbox://styles/mapbox/outdoors-v12";
+const MAP_STYLE_DEFAULT = "mapbox://styles/mapbox/dark-v11";
+const TERRAIN_EXAGGERATION = 1.8;
 
 interface Props {
   coordinates: Coordinate[];
   style?: object;
   interactive?: boolean;
+  enable3D?: boolean;
 }
 
 function getBearing(a: number[], b: number[]): number {
@@ -37,7 +45,9 @@ export default function RunMap({
   coordinates,
   style,
   interactive = true,
+  enable3D = false,
 }: Props) {
+  const { theme } = useUnistyles();
   const cameraRef = useRef<Camera>(null);
 
   const coords = useMemo(
@@ -108,19 +118,17 @@ export default function RunMap({
     [coordinates.length]
   );
 
-  // When running, follow the route with bearing
   useEffect(() => {
     if (!cameraRef.current || !hasRoute) return;
     cameraRef.current.setCamera({
       centerCoordinate: lastCoord,
-      zoomLevel: 16,
-      pitch: 60,
+      zoomLevel: enable3D ? 14.5 : 16,
+      pitch: enable3D ? 75 : 60,
       heading: bearing,
       animationDuration: 1200,
     });
-  }, [coordinates.length]);
+  }, [bearing, coordinates.length, enable3D, hasRoute, lastCoord]);
 
-  // Bounds for static (non-interactive) display like history cards
   const bounds = useMemo(() => {
     if (!hasRoute) return undefined;
     let minLng = Infinity,
@@ -139,16 +147,18 @@ export default function RunMap({
     };
   }, [coordinates.length]);
 
-  // When idle (no route): follow user location with heading
-  // When running: follow route coordinates
-  // When static (non-interactive): fit bounds
   const isIdle = interactive && !hasRoute;
 
   return (
-    <View style={[{ flex: 1, overflow: "hidden", backgroundColor: "#0a0a0a" }, style]}>
+    <View
+      style={[
+        { flex: 1, overflow: "hidden", backgroundColor: enable3D ? theme.colors.mapBg3D : theme.colors.mapBg },
+        style,
+      ]}
+    >
       <MapView
         style={{ flex: 1 }}
-        styleURL="mapbox://styles/mapbox/dark-v11"
+        styleURL={enable3D ? MAP_STYLE_3D : MAP_STYLE_DEFAULT}
         logoEnabled={false}
         attributionEnabled={false}
         compassEnabled={false}
@@ -158,12 +168,41 @@ export default function RunMap({
         rotateEnabled={interactive}
         zoomEnabled={interactive}
       >
+        {enable3D && (
+          <>
+            <RasterDemSource
+              id="mapbox-dem"
+              url="mapbox://mapbox.mapbox-terrain-dem-v1"
+              tileSize={512}
+              maxZoomLevel={14}
+            />
+            <Terrain
+              sourceID="mapbox-dem"
+              style={{ exaggeration: TERRAIN_EXAGGERATION }}
+            />
+            <VectorSource id="mapbox-buildings" url="mapbox://mapbox.mapbox-streets-v8">
+              <FillExtrusionLayer
+                id="3d-buildings"
+                sourceLayerID="building"
+                minZoomLevel={14}
+                maxZoomLevel={22}
+                filter={["==", ["get", "extrude"], "true"]}
+                style={{
+                  fillExtrusionColor: theme.colors.building,
+                  fillExtrusionHeight: ["coalesce", ["get", "height"], 0],
+                  fillExtrusionBase: ["coalesce", ["get", "min_height"], 0],
+                  fillExtrusionOpacity: 0.35,
+                }}
+              />
+            </VectorSource>
+          </>
+        )}
+
         <Camera
           ref={cameraRef}
           followUserLocation={isIdle}
-          followUserMode="compass"
-          followZoomLevel={16}
-          followPitch={60}
+          followZoomLevel={enable3D ? 14.5 : 16}
+          followPitch={enable3D ? 75 : 60}
           {...(bounds && !interactive
             ? {
                 bounds: {
@@ -176,14 +215,14 @@ export default function RunMap({
                 },
               }
             : !isIdle
-              ? {
-                  defaultSettings: {
-                    centerCoordinate: lastCoord || [0, 0],
-                    zoomLevel: 16,
-                    pitch: 60,
-                    heading: bearing,
-                  },
-                }
+                ? {
+                    defaultSettings: {
+                      centerCoordinate: lastCoord || [0, 0],
+                      zoomLevel: enable3D ? 14.5 : 16,
+                      pitch: enable3D ? 75 : 60,
+                      heading: bearing,
+                    },
+                  }
               : {})}
         />
 
@@ -193,7 +232,7 @@ export default function RunMap({
               <LineLayer
                 id="route-glow-layer"
                 style={{
-                  lineColor: PINK,
+                  lineColor: theme.colors.accent,
                   lineWidth: 10,
                   lineOpacity: 0.2,
                   lineBlur: 6,
@@ -205,7 +244,7 @@ export default function RunMap({
               <LineLayer
                 id="route-line-layer"
                 style={{
-                  lineColor: PINK,
+                  lineColor: theme.colors.accent,
                   lineWidth: 4,
                   lineOpacity: 0.9,
                   lineJoin: "round",
@@ -219,7 +258,7 @@ export default function RunMap({
                 id="start-glow-layer"
                 style={{
                   circleRadius: 12,
-                  circleColor: PINK,
+                  circleColor: theme.colors.accent,
                   circleOpacity: 0.15,
                 }}
               />
@@ -227,9 +266,9 @@ export default function RunMap({
                 id="start-layer"
                 style={{
                   circleRadius: 6,
-                  circleColor: PINK,
+                  circleColor: theme.colors.accent,
                   circleStrokeWidth: 2,
-                  circleStrokeColor: "#fff",
+                  circleStrokeColor: theme.colors.foreground,
                 }}
               />
             </ShapeSource>
@@ -239,7 +278,7 @@ export default function RunMap({
                 id="end-glow-layer"
                 style={{
                   circleRadius: 14,
-                  circleColor: "#fff",
+                  circleColor: theme.colors.foreground,
                   circleOpacity: 0.1,
                 }}
               />
@@ -247,16 +286,15 @@ export default function RunMap({
                 id="end-layer"
                 style={{
                   circleRadius: 7,
-                  circleColor: "#fff",
+                  circleColor: theme.colors.foreground,
                   circleStrokeWidth: 3,
-                  circleStrokeColor: PINK,
+                  circleStrokeColor: theme.colors.accent,
                 }}
               />
             </ShapeSource>
           </>
         )}
 
-        {/* Always show location puck */}
         <LocationPuck puckBearing="heading" pulsing={{ isEnabled: true }} />
       </MapView>
     </View>

@@ -1,9 +1,10 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { View } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 import { Coordinate } from "@/utils/run-storage";
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
-const PINK = "#FF375F";
+const MAP_STYLE_3D = "mapbox://styles/mapbox/outdoors-v12";
 
 let mapboxgl: typeof import("mapbox-gl") | null = null;
 if (typeof window !== "undefined") {
@@ -40,12 +41,15 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
   { coordinates, style, onStatusChange, onProgress },
   ref
 ) {
+  const { theme } = useUnistyles();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentStepRef = useRef(0);
   const isPausedRef = useRef(false);
   const coordsRef = useRef<number[][]>([]);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   const stopTimer = () => {
     if (timerRef.current) {
@@ -111,12 +115,9 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
         if (mapInstanceRef.current && coords.length > 0) {
           mapInstanceRef.current.easeTo({
             center: coords[0],
-            bearing: getBearing(
-              coords[0],
-              coords[Math.min(3, coords.length - 1)]
-            ),
-            pitch: 60,
-            zoom: 15.5,
+            bearing: getBearing(coords[0], coords[Math.min(3, coords.length - 1)]),
+            pitch: 75,
+            zoom: 14.5,
             duration: 600,
           });
         }
@@ -130,113 +131,89 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
   useEffect(() => {
     if (!mapRef.current || !mapboxgl || coordinates.length < 2) return;
 
+    const t = themeRef.current;
     const coords = coordinates.map((c) => [c.longitude, c.latitude]);
     coordsRef.current = coords;
 
     const map = new mapboxgl.Map({
       container: mapRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
+      style: MAP_STYLE_3D,
       center: coords[0] as [number, number],
-      zoom: 15.5,
-      pitch: 60,
+      zoom: 14.5,
+      pitch: 75,
       bearing: getBearing(coords[0], coords[Math.min(3, coords.length - 1)]),
       interactive: false,
       attributionControl: false,
+      antialias: true,
     });
     mapInstanceRef.current = map;
 
     map.on("load", () => {
+      // 3D setup
+      map.setFog({
+        range: [0.5, 10],
+        color: t.colors.fogColor,
+        "high-color": t.colors.fogHigh,
+        "horizon-blend": 0.05,
+        "space-color": t.colors.fogSpace,
+        "star-intensity": 0.15,
+      });
+
+      if (!map.getSource("mapbox-dem")) {
+        map.addSource("mapbox-dem", { type: "raster-dem", url: "mapbox://mapbox.mapbox-terrain-dem-v1", tileSize: 512, maxzoom: 14 });
+      }
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.8 });
+
+      if (!map.getSource("mapbox-buildings")) {
+        map.addSource("mapbox-buildings", { type: "vector", url: "mapbox://mapbox.mapbox-streets-v8" });
+      }
+      if (!map.getLayer("3d-buildings")) {
+        const labelLayerId = map.getStyle().layers?.find((layer: any) => layer.type === "symbol" && layer.layout?.["text-field"])?.id;
+        map.addLayer({
+          id: "3d-buildings",
+          type: "fill-extrusion",
+          source: "mapbox-buildings",
+          "source-layer": "building",
+          filter: ["==", ["get", "extrude"], "true"],
+          minzoom: 14,
+          paint: {
+            "fill-extrusion-color": t.colors.building,
+            "fill-extrusion-height": ["coalesce", ["get", "height"], 0],
+            "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
+            "fill-extrusion-opacity": 0.35,
+          },
+        }, labelLayerId);
+      }
+
+      // Route layers
       map.addSource("route", {
         type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: coords },
-        },
+        data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } },
       });
-      map.addLayer({
-        id: "route-glow",
-        type: "line",
-        source: "route",
-        paint: {
-          "line-color": PINK,
-          "line-width": 8,
-          "line-opacity": 0.3,
-          "line-blur": 4,
-        },
-      });
-      map.addLayer({
-        id: "route",
-        type: "line",
-        source: "route",
-        layout: { "line-join": "round", "line-cap": "round" },
-        paint: { "line-color": PINK, "line-width": 4, "line-opacity": 0.9 },
-      });
+      map.addLayer({ id: "route-glow", type: "line", source: "route", paint: { "line-color": t.colors.accent, "line-width": 8, "line-opacity": 0.3, "line-blur": 4 } });
+      map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": t.colors.accent, "line-width": 4, "line-opacity": 0.9 } });
 
+      // Start
       map.addSource("start", {
         type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Point", coordinates: coords[0] },
-        },
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
       });
-      map.addLayer({
-        id: "start",
-        type: "circle",
-        source: "start",
-        paint: {
-          "circle-radius": 6,
-          "circle-color": PINK,
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#fff",
-        },
-      });
+      map.addLayer({ id: "start", type: "circle", source: "start", paint: { "circle-radius": 6, "circle-color": t.colors.accent, "circle-stroke-width": 2, "circle-stroke-color": t.colors.foreground } });
 
+      // End
       map.addSource("end", {
         type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "Point",
-            coordinates: coords[coords.length - 1],
-          },
-        },
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[coords.length - 1] } },
       });
-      map.addLayer({
-        id: "end",
-        type: "circle",
-        source: "end",
-        paint: {
-          "circle-radius": 7,
-          "circle-color": "#fff",
-          "circle-stroke-width": 3,
-          "circle-stroke-color": PINK,
-        },
-      });
+      map.addLayer({ id: "end", type: "circle", source: "end", paint: { "circle-radius": 7, "circle-color": t.colors.foreground, "circle-stroke-width": 3, "circle-stroke-color": t.colors.accent } });
 
+      // Progress
       map.addSource("progress", {
         type: "geojson",
-        data: {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Point", coordinates: coords[0] },
-        },
+        data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } },
       });
-      map.addLayer({
-        id: "progress",
-        type: "circle",
-        source: "progress",
-        paint: {
-          "circle-radius": 5,
-          "circle-color": "#fff",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": PINK,
-        },
-      });
+      map.addLayer({ id: "progress", type: "circle", source: "progress", paint: { "circle-radius": 5, "circle-color": t.colors.foreground, "circle-stroke-width": 2, "circle-stroke-color": t.colors.accent } });
 
-      // Auto-play
       onStatusChange?.("playing");
       setTimeout(animate, 800);
     });
@@ -249,9 +226,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
   }, [coordinates]);
 
   return (
-    <View
-      style={[{ flex: 1, overflow: "hidden", backgroundColor: "#0a0a0a" }, style]}
-    >
+    <View style={[{ flex: 1, overflow: "hidden", backgroundColor: theme.colors.mapBg3D }, style]}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
     </View>
   );

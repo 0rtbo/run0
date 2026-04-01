@@ -1,14 +1,13 @@
-import { ThemeProvider } from "@/components/theme-provider";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
-
-const PINK = "#FF375F";
+import { useUnistyles } from "react-native-unistyles";
 
 export default function Layout() {
+  const { theme } = useUnistyles();
+
   return (
-    <ThemeProvider>
       <NativeTabs
-        tintColor={"#FF375F"}
+        tintColor={theme.colors.accent}
         shadowColor="transparent"
       >
         <NativeTabs.Trigger name="(run)">
@@ -47,7 +46,18 @@ export default function Layout() {
           />
           <NativeTabs.Trigger.Label>Stats</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="(test)">
+          <NativeTabs.Trigger.Icon
+            sf="chart.bar.fill"
+            src={
+              <NativeTabs.Trigger.VectorIcon
+                family={Ionicons}
+                name="stats-chart"
+              />
+            }
+          />
+          <NativeTabs.Trigger.Label>Tests</NativeTabs.Trigger.Label>
+        </NativeTabs.Trigger>
       </NativeTabs>
-    </ThemeProvider>
   );
 }

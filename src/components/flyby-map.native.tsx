@@ -8,9 +8,14 @@ import {
   forwardRef,
 } from "react";
 import { View } from "react-native";
+import { useUnistyles } from "react-native-unistyles";
 import Mapbox, {
   MapView,
   Camera,
+  RasterDemSource,
+  Terrain,
+  VectorSource,
+  FillExtrusionLayer,
   ShapeSource,
   LineLayer,
   CircleLayer,
@@ -21,7 +26,8 @@ const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? "";
 Mapbox.setAccessToken(TOKEN);
 Mapbox.setTelemetryEnabled(false);
 
-const PINK = "#FF375F";
+const MAP_STYLE_3D = "mapbox://styles/mapbox/outdoors-v12";
+const TERRAIN_EXAGGERATION = 1.8;
 
 export interface FlybyHandle {
   play: () => void;
@@ -51,6 +57,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
   { coordinates, style, onStatusChange, onProgress },
   ref
 ) {
+  const { theme } = useUnistyles();
   const cameraRef = useRef<Camera>(null);
   const [step, setStep] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,13 +81,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
     () => ({
       type: "FeatureCollection",
       features: hasRoute
-        ? [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "LineString", coordinates: coords },
-            },
-          ]
+        ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } }]
         : [],
     }),
     [coords]
@@ -91,13 +92,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
       type: "FeatureCollection",
       features:
         coords.length > 0
-          ? [
-              {
-                type: "Feature",
-                properties: {},
-                geometry: { type: "Point", coordinates: coords[0] },
-              },
-            ]
+          ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0] } }]
           : [],
     }),
     [coords]
@@ -107,16 +102,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
     () => ({
       type: "FeatureCollection",
       features: hasRoute
-        ? [
-            {
-              type: "Feature",
-              properties: {},
-              geometry: {
-                type: "Point",
-                coordinates: coords[coords.length - 1],
-              },
-            },
-          ]
+        ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[coords.length - 1] } }]
         : [],
     }),
     [coords]
@@ -126,14 +112,7 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
     () => ({
       type: "FeatureCollection",
       features: [
-        {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            type: "Point",
-            coordinates: coords[step] || coords[0] || [0, 0],
-          },
-        },
+        { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[step] || coords[0] || [0, 0] } },
       ],
     }),
     [step, coords]
@@ -197,11 +176,8 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
         if (isPausedRef.current) {
           isPausedRef.current = false;
           onStatusChange?.("playing");
-          if (!timerRef.current) {
-            startAnimation(currentStepRef.current);
-          }
+          if (!timerRef.current) startAnimation(currentStepRef.current);
         } else if (!timerRef.current) {
-          // Finished — restart from current
           startAnimation(currentStepRef.current);
         }
       },
@@ -215,8 +191,8 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
         setStep(0);
         cameraRef.current?.setCamera({
           centerCoordinate: coords[0],
-          zoomLevel: 15.5,
-          pitch: 60,
+          zoomLevel: 14.5,
+          pitch: 75,
           heading: initialBearing,
           animationDuration: 600,
         });
@@ -226,7 +202,6 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
     [coords, initialBearing, startAnimation, stopTimer, onStatusChange]
   );
 
-  // Auto-play on mount
   useEffect(() => {
     if (!hasRoute) return;
     const timeout = setTimeout(() => startAnimation(0), 800);
@@ -237,19 +212,14 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
   }, [hasRoute]);
 
   if (!hasRoute) {
-    return <View style={[{ flex: 1, backgroundColor: "#0a0a0a" }, style]} />;
+    return <View style={[{ flex: 1, backgroundColor: theme.colors.mapBg3D }, style]} />;
   }
 
   return (
-    <View
-      style={[
-        { flex: 1, overflow: "hidden", backgroundColor: "#0a0a0a" },
-        style,
-      ]}
-    >
+    <View style={[{ flex: 1, overflow: "hidden", backgroundColor: theme.colors.mapBg3D }, style]}>
       <MapView
         style={{ flex: 1 }}
-        styleURL="mapbox://styles/mapbox/dark-v11"
+        styleURL={MAP_STYLE_3D}
         logoEnabled={false}
         attributionEnabled={false}
         compassEnabled={false}
@@ -259,99 +229,50 @@ const FlybyMap = forwardRef<FlybyHandle, Props>(function FlybyMap(
         rotateEnabled={false}
         zoomEnabled={false}
       >
+        <RasterDemSource id="mapbox-dem" url="mapbox://mapbox.mapbox-terrain-dem-v1" tileSize={512} maxZoomLevel={14} />
+        <Terrain sourceID="mapbox-dem" style={{ exaggeration: TERRAIN_EXAGGERATION }} />
+        <VectorSource id="mapbox-buildings" url="mapbox://mapbox.mapbox-streets-v8">
+          <FillExtrusionLayer
+            id="3d-buildings"
+            sourceLayerID="building"
+            minZoomLevel={14}
+            maxZoomLevel={22}
+            filter={["==", ["get", "extrude"], "true"]}
+            style={{
+              fillExtrusionColor: theme.colors.building,
+              fillExtrusionHeight: ["coalesce", ["get", "height"], 0],
+              fillExtrusionBase: ["coalesce", ["get", "min_height"], 0],
+              fillExtrusionOpacity: 0.35,
+            }}
+          />
+        </VectorSource>
+
         <Camera
           ref={cameraRef}
-          defaultSettings={{
-            centerCoordinate: coords[0],
-            zoomLevel: 15.5,
-            pitch: 60,
-            heading: initialBearing,
-          }}
+          defaultSettings={{ centerCoordinate: coords[0], zoomLevel: 14.5, pitch: 75, heading: initialBearing }}
         />
 
         <ShapeSource id="route-glow" shape={routeGeoJSON}>
-          <LineLayer
-            id="route-glow-layer"
-            style={{
-              lineColor: PINK,
-              lineWidth: 8,
-              lineOpacity: 0.3,
-              lineBlur: 4,
-            }}
-          />
+          <LineLayer id="route-glow-layer" style={{ lineColor: theme.colors.accent, lineWidth: 8, lineOpacity: 0.3, lineBlur: 4 }} />
         </ShapeSource>
 
         <ShapeSource id="route-line" shape={routeGeoJSON}>
-          <LineLayer
-            id="route-line-layer"
-            style={{
-              lineColor: PINK,
-              lineWidth: 4,
-              lineOpacity: 0.9,
-              lineJoin: "round",
-              lineCap: "round",
-            }}
-          />
+          <LineLayer id="route-line-layer" style={{ lineColor: theme.colors.accent, lineWidth: 4, lineOpacity: 0.9, lineJoin: "round", lineCap: "round" }} />
         </ShapeSource>
 
         <ShapeSource id="start-point" shape={startGeoJSON}>
-          <CircleLayer
-            id="start-glow-layer"
-            style={{
-              circleRadius: 12,
-              circleColor: PINK,
-              circleOpacity: 0.2,
-            }}
-          />
-          <CircleLayer
-            id="start-layer"
-            style={{
-              circleRadius: 6,
-              circleColor: PINK,
-              circleStrokeWidth: 2,
-              circleStrokeColor: "#fff",
-            }}
-          />
+          <CircleLayer id="start-glow-layer" style={{ circleRadius: 12, circleColor: theme.colors.accent, circleOpacity: 0.2 }} />
+          <CircleLayer id="start-layer" style={{ circleRadius: 6, circleColor: theme.colors.accent, circleStrokeWidth: 2, circleStrokeColor: theme.colors.foreground }} />
         </ShapeSource>
 
         <ShapeSource id="end-point" shape={endGeoJSON}>
-          <CircleLayer
-            id="end-glow-layer"
-            style={{
-              circleRadius: 14,
-              circleColor: "#fff",
-              circleOpacity: 0.15,
-            }}
-          />
-          <CircleLayer
-            id="end-layer"
-            style={{
-              circleRadius: 7,
-              circleColor: "#fff",
-              circleStrokeWidth: 3,
-              circleStrokeColor: PINK,
-            }}
-          />
+          <CircleLayer id="end-glow-layer" style={{ circleRadius: 14, circleColor: theme.colors.foreground, circleOpacity: 0.15 }} />
+          <CircleLayer id="end-layer" style={{ circleRadius: 7, circleColor: theme.colors.foreground, circleStrokeWidth: 3, circleStrokeColor: theme.colors.accent }} />
         </ShapeSource>
 
         <ShapeSource id="progress-point" shape={progressGeoJSON}>
-          <CircleLayer
-            id="progress-glow-layer"
-            style={{
-              circleRadius: 16,
-              circleColor: PINK,
-              circleOpacity: 0.25,
-            }}
-          />
-          <CircleLayer
-            id="progress-layer"
-            style={{
-              circleRadius: 5,
-              circleColor: "#fff",
-              circleStrokeWidth: 2,
-              circleStrokeColor: PINK,
-            }}
-          />
+          <CircleLayer id="progress-glow-layer" style={{ circleRadius: 16, circleColor: theme.colors.accent, circleOpacity: 0.25 }} />
+          <CircleLayer id="progress-layer" style={{ circleRadius: 5, circleColor: theme.colors.foreground, circleStrokeWidth: 2, circleStrokeColor: theme.colors.accent }} />
         </ShapeSource>
       </MapView>
     </View>

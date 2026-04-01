@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, StatusBar } from "react-native";
+import { View, Text, Pressable, StatusBar } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
@@ -13,15 +14,11 @@ import {
   formatPace,
 } from "@/utils/run-storage";
 
-const PINK = "#FF375F";
-const BG = "#0a0a0a";
-const DIM = "rgba(255,255,255,0.5)";
-const WHITE = "#fff";
-
 export default function RunDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const [run, setRun] = useState<Run | null>(null);
   const [playbackStatus, setPlaybackStatus] = useState<
     "playing" | "paused" | "finished"
@@ -38,7 +35,7 @@ export default function RunDetailScreen() {
     }, [id])
   );
 
-  if (!run) return <View style={{ flex: 1, backgroundColor: BG }} />;
+  if (!run) return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
 
   const date = new Date(run.date);
   const dateStr = date.toLocaleDateString(undefined, {
@@ -69,7 +66,7 @@ export default function RunDetailScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" />
-      <View style={[styles.root, { backgroundColor: BG }]}>
+      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         {/* Full screen flyby map */}
         <FlybyMap
           ref={flybyRef}
@@ -93,7 +90,7 @@ export default function RunDetailScreen() {
               sf="chevron.left"
               fallback="chevron-back"
               size={16}
-              color={WHITE}
+              color={theme.colors.foreground}
             />
           </Pressable>
 
@@ -113,7 +110,7 @@ export default function RunDetailScreen() {
                 sf="arrow.counterclockwise"
                 fallback="refresh"
                 size={16}
-                color={WHITE}
+                color={theme.colors.foreground}
               />
             </Pressable>
             <Pressable
@@ -134,7 +131,7 @@ export default function RunDetailScreen() {
                 sf={playbackStatus === "playing" ? "pause.fill" : "play.fill"}
                 fallback={playbackStatus === "playing" ? "pause" : "play"}
                 size={16}
-                color={WHITE}
+                color={theme.colors.foreground}
               />
             </Pressable>
           </View>
@@ -210,16 +207,18 @@ function StatCell({
   sf: string;
   fallback: React.ComponentProps<typeof Icon>["fallback"];
 }) {
+  const { theme } = useUnistyles();
+
   return (
     <View style={styles.statCell}>
-      <Icon sf={sf} fallback={fallback} size={14} color={PINK} />
+      <Icon sf={sf} fallback={fallback} size={14} color={theme.colors.accent} />
       <Text style={styles.cellValue}>{value}</Text>
       <Text style={styles.cellLabel}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   root: {
     flex: 1,
   },
@@ -238,14 +237,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: theme.colors.default,
     alignItems: "center",
     justifyContent: "center",
   },
   topTitle: {
     flex: 1,
     textAlign: "center",
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 15,
     fontWeight: "600",
     letterSpacing: 1,
@@ -261,19 +260,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: theme.colors.border,
     zIndex: 20,
   },
   progressBar: {
     height: 3,
-    backgroundColor: PINK,
+    backgroundColor: theme.colors.accent,
   },
   overlay: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(10,10,10,0.88)",
+    backgroundColor: theme.colors.overlay,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -284,12 +283,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   runTitle: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 20,
     fontWeight: "700",
   },
   runDate: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 13,
   },
   primaryStat: {
@@ -298,27 +297,27 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   primaryValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 52,
     fontWeight: "200",
     fontVariant: ["tabular-nums"],
     letterSpacing: -2,
   },
   primaryUnit: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 18,
     fontWeight: "500",
   },
   statsGrid: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: theme.colors.default,
     borderRadius: 14,
     borderCurve: "continuous",
     overflow: "hidden",
   },
   gridDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: theme.colors.separator,
   },
   statCell: {
     flex: 1,
@@ -327,21 +326,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   cellValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 16,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
   cellLabel: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 10,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },
   hint: {
-    color: "rgba(255,255,255,0.25)",
+    color: theme.colors.muted,
     fontSize: 11,
     textAlign: "center",
   },
-});
+}));

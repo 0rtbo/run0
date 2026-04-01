@@ -4,9 +4,9 @@ import {
   Text,
   Pressable,
   Alert,
-  StyleSheet,
   Animated,
 } from "react-native";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
@@ -18,21 +18,72 @@ import {
   Run,
   saveRun,
   calcDistance,
+  distanceBetween,
   formatDuration,
   formatDistance,
   formatPace,
 } from "@/utils/run-storage";
 
-const PINK = "#FF375F";
-const BG = "#0a0a0a";
-const CARD = "#1a1a1a";
-const DIM = "rgba(255,255,255,0.5)";
-const WHITE = "#fff";
+const MAX_ACCEPTED_ACCURACY_METERS = 25;
+const MIN_SIGNIFICANT_MOVEMENT_METERS = 4;
+const MIN_RUNNING_SPEED_MPS = 0.8;
+const MAX_REASONABLE_RUNNING_SPEED_MPS = 8.5;
 
 type RunState = "idle" | "running" | "paused" | "done";
 
+function shouldAcceptCoordinate(
+  next: Coordinate,
+  previous?: Coordinate
+): boolean {
+  if (
+    !Number.isFinite(next.latitude) ||
+    !Number.isFinite(next.longitude) ||
+    (next.accuracy != null && next.accuracy > MAX_ACCEPTED_ACCURACY_METERS)
+  ) {
+    return false;
+  }
+
+  if (!previous) {
+    return true;
+  }
+
+  const distance = distanceBetween(previous, next);
+  if (distance < MIN_SIGNIFICANT_MOVEMENT_METERS) {
+    return false;
+  }
+
+  const elapsedMs =
+    typeof previous.timestamp === "number" && typeof next.timestamp === "number"
+      ? next.timestamp - previous.timestamp
+      : 0;
+
+  if (elapsedMs <= 0) {
+    return true;
+  }
+
+  const derivedSpeed = distance / (elapsedMs / 1000);
+  const reportedSpeed = next.speed ?? previous.speed ?? derivedSpeed;
+
+  if (
+    reportedSpeed < MIN_RUNNING_SPEED_MPS &&
+    distance < 10
+  ) {
+    return false;
+  }
+
+  if (
+    derivedSpeed > MAX_REASONABLE_RUNNING_SPEED_MPS &&
+    (next.accuracy ?? 0) > 15
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export default function RunScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useUnistyles();
   const [runState, setRunState] = useState<RunState>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [coordinates, setCoordinates] = useState<Coordinate[]>([]);
@@ -74,17 +125,25 @@ export default function RunScreen() {
     }
     const sub = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 2000,
-        distanceInterval: 5,
+        accuracy: Location.Accuracy.Highest,
+        timeInterval: 3000,
+        distanceInterval: 8,
       },
       (loc) => {
         const coord: Coordinate = {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,
+          accuracy: loc.coords.accuracy,
+          speed: loc.coords.speed,
+          timestamp: loc.timestamp,
         };
+
+        const previous = coordsRef.current[coordsRef.current.length - 1];
+        if (!shouldAcceptCoordinate(coord, previous)) {
+          return;
+        }
+
         coordsRef.current.push(coord);
-        // Shallow copy so React sees a new array reference, but we reuse the same objects
         setCoordinates(coordsRef.current.slice());
         setDistance(calcDistance(coordsRef.current));
       }
@@ -162,9 +221,13 @@ export default function RunScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.root, { backgroundColor: BG }]}>
+      <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
         {/* Full screen map */}
-        <RunMap coordinates={coordinates} style={StyleSheet.absoluteFillObject} />
+        <RunMap
+          coordinates={coordinates}
+          style={StyleSheet.absoluteFillObject}
+          enable3D
+        />
 
         {/* Dark gradient overlay at top */}
         <View
@@ -244,7 +307,7 @@ export default function RunScreen() {
                     { opacity: pressed ? 0.7 : 1 },
                   ]}
                 >
-                  <Icon sf="pause.fill" fallback="pause" size={24} color={WHITE} />
+                  <Icon sf="pause.fill" fallback="pause" size={24} color={theme.colors.foreground} />
                 </Pressable>
                 <HoldToStop onComplete={handleFinish} />
               </View>
@@ -260,7 +323,7 @@ export default function RunScreen() {
                     { opacity: pressed ? 0.7 : 1 },
                   ]}
                 >
-                  <Icon sf="play.fill" fallback="play" size={24} color={BG} />
+                  <Icon sf="play.fill" fallback="play" size={24} color={theme.colors.accentForeground} />
                 </Pressable>
                 <HoldToStop onComplete={handleFinish} />
               </View>
@@ -293,6 +356,7 @@ export default function RunScreen() {
 const HOLD_DURATION = 1500;
 
 function HoldToStop({ onComplete }: { onComplete: () => void }) {
+  const { theme } = useUnistyles();
   const fillAnim = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holding, setHolding] = useState(false);
@@ -342,7 +406,7 @@ function HoldToStop({ onComplete }: { onComplete: () => void }) {
         ]}
       />
       <View style={styles.holdContent}>
-        <Icon sf="stop.fill" fallback="stop" size={16} color={WHITE} />
+        <Icon sf="stop.fill" fallback="stop" size={16} color={theme.colors.foreground} />
         <Text style={styles.holdText}>
           {holding ? "HOLD..." : "HOLD TO END"}
         </Text>
@@ -351,7 +415,7 @@ function HoldToStop({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create((theme) => ({
   root: {
     flex: 1,
   },
@@ -365,10 +429,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: "transparent",
+    backgroundColor: theme.colors.transparent,
   },
   screenTitle: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 2,
@@ -382,10 +446,10 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: PINK,
+    backgroundColor: theme.colors.accent,
   },
   liveText: {
-    color: PINK,
+    color: theme.colors.accent,
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 1,
@@ -395,9 +459,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(10,10,10,0.92)",
     borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingTop: 20,
     paddingHorizontal: 20,
   },
@@ -411,14 +473,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   mainStatValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 64,
     fontWeight: "200",
     fontVariant: ["tabular-nums"],
     letterSpacing: -2,
   },
   mainStatUnit: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 20,
     fontWeight: "500",
   },
@@ -434,17 +496,17 @@ const styles = StyleSheet.create({
   statDivider: {
     width: StyleSheet.hairlineWidth,
     height: 28,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: theme.colors.default,
   },
   statLabel: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
   statValue: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 17,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
@@ -453,14 +515,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   startButton: {
-    backgroundColor: PINK,
-    borderRadius: 32,
-    borderCurve: "continuous",
+    backgroundColor: theme.colors.accent,
     paddingVertical: 18,
     alignItems: "center",
   },
   startText: {
-    color: BG,
+    color: theme.colors.accentForeground,
     fontSize: 18,
     fontWeight: "800",
     letterSpacing: 3,
@@ -474,17 +534,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: theme.colors.default,
     alignItems: "center",
     justifyContent: "center",
   },
   stopButton: {
-    backgroundColor: "rgba(255,59,48,0.3)",
+    backgroundColor: theme.colors.danger,
   },
   holdButton: {
     height: 64,
     borderRadius: 32,
-    backgroundColor: "rgba(255,59,48,0.2)",
+    backgroundColor: theme.colors.dangerSoft,
     overflow: "hidden",
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -495,7 +555,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: "rgba(255,59,48,0.5)",
+    backgroundColor: theme.colors.danger,
     borderRadius: 32,
   },
   holdContent: {
@@ -505,18 +565,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   holdText: {
-    color: WHITE,
+    color: theme.colors.foreground,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 1.5,
   },
   resumeButton: {
-    backgroundColor: PINK,
+    backgroundColor: theme.colors.accent,
   },
   warning: {
-    color: DIM,
+    color: theme.colors.muted,
     fontSize: 12,
     textAlign: "center",
     marginTop: 12,
   },
-});
+}));
